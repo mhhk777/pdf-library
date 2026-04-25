@@ -1,0 +1,224 @@
+html
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>مكتبة PDF</title>
+
+<!-- Bootstrap -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
+<style>
+body {
+    background: #f5f7fa;
+    font-family: "Tajawal", sans-serif;
+}
+
+/* Header */
+.header-box {
+    background: linear-gradient(135deg, #007bff, #6610f2);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* Category Card */
+.category-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: 0.3s;
+    border: 1px solid #eee;
+}
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    cursor: pointer;
+}
+
+/* PDF Card */
+.pdf-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid #eee;
+    transition: 0.3s;
+}
+.pdf-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+.pdf-card img {
+    width: 70px;
+}
+
+/* Popup */
+.pdf-popup {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    justify-content: center;
+    align-items: center;
+}
+.pdf-popup-content {
+    background: #fff;
+    width: 85%;
+    max-width: 900px;
+    padding: 15px;
+    border-radius: 10px;
+    position: relative;
+}
+.pdf-popup-content iframe {
+    width: 100%;
+    height: 600px;
+}
+.pdf-close {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    font-size: 28px;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="header-box">
+        <h1 class="fw-bold">📚 مكتبة ملفات PDF</h1>
+        <p>استعرض ملفاتك بسهولة — عبر Google Drive</p>
+    </div>
+
+    <!-- QR Code Section -->
+    <div class="text-center mb-5">
+        <h5 class="fw-bold">📱 افتح هذه المكتبة عبر QR Code</h5>
+        <div id="qrcode" class="my-3"></div>
+
+        <button class="btn btn-dark btn-sm" onclick="downloadQR()">
+            <i class="fa-solid fa-download"></i> تحميل QR كصورة
+        </button>
+    </div>
+
+    <!-- Categories -->
+    <h3 class="fw-bold mb-3">📁 التصنيفات</h3>
+    <div id="categoryList" class="row g-4"></div>
+
+    <!-- Files -->
+    <h3 id="categoryTitle" class="fw-bold mt-5"></h3>
+    <div id="pdfList" class="row g-4"></div>
+
+</div>
+
+<!-- Popup -->
+<div id="pdfPopup" class="pdf-popup">
+    <div class="pdf-popup-content">
+        <span class="pdf-close" onclick="closePdfPopup()">&times;</span>
+        <iframe id="pdfFrame" src=""></iframe>
+    </div>
+</div>
+
+<!-- QR Code Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// ضع Folder ID الرئيسي هنا
+const mainFolderId = "14_AXYP_-ww1AGQf97Zs_mtZYQCE9jtex?usp=sharing";
+
+// توليد QR Code تلقائيًا
+var qrDiv = document.getElementById("qrcode");
+var qr = new QRCode(qrDiv, {
+    text: window.location.href,
+    width: 150,
+    height: 150
+});
+
+// تحميل QR كصورة
+function downloadQR() {
+    var img = qrDiv.getElementsByTagName("img")[0];
+    if (!img) return alert("الرجاء الانتظار حتى يتم توليد QR Code");
+
+    var link = document.createElement("a");
+    link.href = img.src;
+    link.download = "QRCode.png";
+    link.click();
+}
+
+// فتح PDF
+function openPdfPopup(url) {
+    document.getElementById("pdfFrame").src = url;
+    document.getElementById("pdfPopup").style.display = "flex";
+}
+function closePdfPopup() {
+    document.getElementById("pdfPopup").style.display = "none";
+    document.getElementById("pdfFrame").src = "";
+}
+
+// جلب التصنيفات (مجلدات Google Drive)
+fetch(`https://www.googleapis.com/drive/v3/files?q='${mainFolderId}'+in+parents&fields=files(id,name,mimeType)&key=AIzaSyD-FAKE-KEY`)
+.then(res => res.json())
+.then(data => {
+    const list = document.getElementById("categoryList");
+
+    data.files.forEach(folder => {
+        if (folder.mimeType === "application/vnd.google-apps.folder") {
+            list.innerHTML += `
+                <div class="col-md-3">
+                    <div class="category-card" onclick="loadCategory('${folder.id}', '${folder.name}')">
+                        <i class="fa-solid fa-folder fa-3x text-warning mb-2"></i>
+                        <h5>${folder.name}</h5>
+                    </div>
+                </div>
+            `;
+        }
+    });
+});
+
+// تحميل ملفات PDF داخل تصنيف
+function loadCategory(folderId, name) {
+    document.getElementById("categoryTitle").innerHTML = "📁 " + name;
+    document.getElementById("pdfList").innerHTML = "";
+
+    fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType)&key=AIzaSyD-FAKE-KEY`)
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("pdfList");
+
+        data.files.forEach(file => {
+            if (file.mimeType === "application/pdf") {
+                const url = `https://drive.google.com/uc?export=download&id=${file.id}`;
+
+                list.innerHTML += `
+                    <div class="col-md-3">
+                        <div class="pdf-card">
+                            <img src="https://img.icons8.com/ios-filled/100/ff0000/pdf.png">
+                            <h5 class="mt-2">${file.name}</h5>
+
+                            <button class="btn btn-primary btn-sm w-100 mt-2" onclick="openPdfPopup('${url}')">
+                                <i class="fa-solid fa-eye"></i> عرض
+                            </button>
+
+                            <a href="${url}" class="btn btn-success btn-sm w-100 mt-2" download>
+                                <i class="fa-solid fa-download"></i> تحميل
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    });
+}
+</script>
+
+</body>
+</html>
